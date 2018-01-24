@@ -48,8 +48,6 @@ function displaySummaryTable(releaseid){
 
     //call a service to get fixed and reported issue count in github
     
-
-    
     timeline.on('click', function (properties) {
 
       
@@ -64,15 +62,11 @@ function displaySummaryTable(releaseid){
 
       if ($("input[name=optradio]:checked").val()=="All"){
         //use allData
-        console.log("allData");
         data=allData;
         drawSummaryTable(data,cardid,releaseid);
 
       }else if($("input[name=optradio]:checked").val()=="API Manager"){
         //use apimData
-        console.log("apimData");
-        console.log(properties.item);
-        console.log(releaseid);
         data=apimData;
         drawSummaryTable(data,cardid,releaseid);
 
@@ -112,36 +106,254 @@ function displaySummaryTable(releaseid){
       
 
     });
-}
+}//this function not used.
+
+timeline.on('click', function (properties) {
+
+      if (properties.item==null || properties.event.path[2].className != "cardItem"){
+
+          return;
+      }
+
+      var releaseid=properties.event.path[2].attributes[1].nodeValue;  
+      changeButtonColor(releaseid);
+      
+      var cardid=properties.item;
+      var data;
+
+      if ($("input[name=optradio]:checked").val()=="All"){
+        //use allData
+        data=allData;
+        drawSummaryTable(data,cardid,releaseid);
+
+      }else if($("input[name=optradio]:checked").val()=="API Manager"){
+        //use apimData
+        data=apimData;
+        drawSummaryTable(data,cardid,releaseid);
+
+      }else if($("input[name=optradio]:checked").val()=="Analytics"){
+        //use analyticsData
+        data=analyticsData;
+        drawSummaryTable(data,cardid,releaseid);
+
+
+      }else if($("input[name=optradio]:checked").val()=="Cloud"){
+        //use cloudData
+        data=cloudData;
+        drawSummaryTable(data,cardid,releaseid);
+
+      }else if($("input[name=optradio]:checked").val()=="Integration"){
+        //use integrationData
+        data=integrationData;
+        drawSummaryTable(data,cardid,releaseid);
+
+      }else if($("input[name=optradio]:checked").val()=="IOT"){
+        //use iotData
+        data=iotData;
+        drawSummaryTable(data,cardid,releaseid);
+
+      }else if($("input[name=optradio]:checked").val()=="IS"){
+        //use isData
+        data=isData;
+        drawSummaryTable(data,cardid,releaseid);
+
+      }else if($("input[name=optradio]:checked").val()=="Other"){
+        //use otherData
+        data=otherData;
+        drawSummaryTable(data,cardid,releaseid);
+      }
+          
+      data={};
+});//this for click a item in time line
 
 function drawSummaryTable(data,cardid,releaseid){
-  $('.todayposition').addClass("hideObject");//for remove the today button
-  $('#featureTable').show();
-  $('.detailedinfo').empty();
-    var instruction = "<div class=well ><p> Click one of the lables in the Release Summary to see more details. </p></div>"
-  $('.detailedinfo').append(instruction);
+    $('.todayposition').addClass("hideObject");//for remove the today button
+    $('#featureTable').show();
+    $('.detailedinfo').empty();
+      var instruction = "<div class=well ><p> Click one of the lables in the Release Summary to see more details. </p></div>"
+    $('.detailedinfo').append(instruction);
 
-  $('.summary').empty();
-  
-  
-  var dataLength=data[cardid-1].releases.length;
-  
-
-  var dataSet={};
-  for (var i=0;i<dataLength;i++){
-    if (releaseid==data[cardid-1].releases[i].id){
-      dataSet=data[cardid-1].releases[i];
+    $('.summary').empty();
+    
+    
+    
+    var dataLength=data[cardid-1].releases.length;
+    
+    var dataSet={};
+    for (var i=0;i<dataLength;i++){
+      if (releaseid==data[cardid-1].releases[i].id){
+        dataSet=data[cardid-1].releases[i];
+        break;
+      }
       
-      break;
     }
     
-  }
+    
+    var reportedIssueCount=getReportedIssuesCount(dataSet.projectId,dataSet.versionId,dataSet.gitVersionId);
+    var fixedIssueCount=getFixedIssuesCount(dataSet.projectId,dataSet.versionId,dataSet.gitVersionId);
+    
 
-  var source   = $("#releaseSummary").html();
-  var template = Handlebars.compile(source);
-  var html    = template(dataSet);
-  
-  $( ".summary" ).append(  html );
+    dataSet.reportedIssuesCount=reportedIssueCount;
+    dataSet.fixedIssuesCount=fixedIssueCount;
+    
+
+    var source   = $("#releaseSummary").html();
+    var template = Handlebars.compile(source);
+    var html    = template(dataSet);
+    
+    $( ".summary" ).append(  html );
+}
+
+function getReportedIssuesCount(projectId,versionId,gitVersionId){
+
+
+      if(gitVersionId!=0){//check if it is git then it directly find the issues for this gitVersoinId
+
+        var gitRepoAndVersionJson=[];
+        $.ajax({
+            url:"https://"+url+":"+port+"/releaseTrainServices/getRepoAndGitVersionByGitId/"+gitVersionId,
+            async:false,
+            success: function(data){
+              gitRepoAndVersionJson=data;  
+            }
+        });
+
+        
+        var repoName = gitRepoAndVersionJson[0].repoName;
+        var versionName = gitRepoAndVersionJson[0].gitVersionName;
+        var repoOrganizationName = gitRepoAndVersionJson[0].repoOrganizationName
+        
+        var gitIssuesJson=[];
+        $.ajax({
+            url:"https://"+url+":"+port+"/releaseTrainServices/getReportedGitIssuesCount/"+repoOrganizationName+"/"+repoName+"?versionName="+versionName,
+            async:false,
+            success: function(data){
+              gitIssuesJson=data;  
+            }
+        });
+
+        return gitIssuesJson.count;
+      
+      
+      }else{
+
+        var gitRepoAndVersionJson;
+        $.ajax({
+          url:"https://"+url+":"+port+"/releaseTrainServices/getRepoAndVersion"+"/"+projectId+"/"+versionId,
+          async:false,
+          success: function(data){
+            gitRepoAndVersionJson=data;  
+          }
+        });
+
+       var versionName =gitRepoAndVersionJson.versionName; 
+       var repoNames = gitRepoAndVersionJson.repoNames;
+       
+
+       var gitIssuesJson=[];
+       for(i=0;i<repoNames.length;i++){
+         var repoName = repoNames[i].repoName;
+         var repoOrganizationName = repoNames[i].repoOrganizationName;
+        
+         if ((repoName != "") && (versionName != "")){
+           $.ajax({
+            url:"https://"+url+":"+port+"/releaseTrainServices/getReportedGitIssuesCount/"+repoOrganizationName+"/"+repoName+"?versionName="+versionName,
+            async:false,
+            success: function(data){
+              gitIssuesJson=data;  
+            }
+           });
+         }
+
+         if(gitIssuesJson.length > 0){
+          break;
+         }
+         
+       }
+       
+
+      var count=0;
+       if (gitIssuesJson.length != 0){
+          count=gitIssuesJson.count;
+       }
+       return count;
+       
+      }
+}
+
+function getFixedIssuesCount(projectId,versionId,gitVersionId){
+      if(gitVersionId!=0){//check if it is git then it directly find the issues for this gitVersoinId
+
+        var gitRepoAndVersionJson=[];
+        $.ajax({
+            url:"https://"+url+":"+port+"/releaseTrainServices/getRepoAndGitVersionByGitId/"+gitVersionId,
+            async:false,
+            success: function(data){
+              gitRepoAndVersionJson=data;  
+            }
+        });
+
+        
+        var repoName = gitRepoAndVersionJson[0].repoName;
+        var versionName = gitRepoAndVersionJson[0].gitVersionName;
+         var repoOrganizationName = gitRepoAndVersionJson[0].repoOrganizationName
+        var gitIssuesJson=[];
+        $.ajax({
+            url:"https://"+url+":"+port+"/releaseTrainServices/getFixedGitIssuesCount/"+repoOrganizationName+"/"+repoName+"?versionName="+versionName,
+            async:false,
+            success: function(data){
+              gitIssuesJson=data;  
+            }
+        });
+
+        return gitIssuesJson.count;
+      
+      
+      }else{
+
+        var gitRepoAndVersionJson;
+        $.ajax({
+          url:"https://"+url+":"+port+"/releaseTrainServices/getRepoAndVersion"+"/"+projectId+"/"+versionId,
+          async:false,
+          success: function(data){
+            gitRepoAndVersionJson=data;  
+          }
+        });
+
+       var versionName =gitRepoAndVersionJson.versionName; 
+       var repoNames = gitRepoAndVersionJson.repoNames;
+       
+
+       var gitIssuesJson=[];
+       for(i=0;i<repoNames.length;i++){
+         var repoName = repoNames[i].repoName;
+         var repoOrganizationName = repoNames[i].repoOrganizationName;
+
+         
+        
+         if ((repoName != "") && (versionName != "")){
+           $.ajax({
+            url:"https://"+url+":"+port+"/releaseTrainServices/getFixedGitIssuesCount/"+repoOrganizationName+"/"+repoName+"?versionName="+versionName,
+            async:false,
+            success: function(data){
+              gitIssuesJson=data;  
+            }
+           });
+         }
+
+         if(gitIssuesJson.length > 0){
+          break;
+         }
+         
+       }
+
+       
+       var count=0;
+       if (gitIssuesJson.length != 0){
+          count=gitIssuesJson.count;
+       }
+       return count;
+      }
 }
 
 function closeTable(id){
@@ -156,7 +368,7 @@ function drawManagerTable(product,startDate,endDate){
   $('#managerSummary').empty();
 
   $.ajax({
-      url:"https://"+url+":"+port+"/base/manager/"+product+"/"+startDate+"/"+endDate,
+      url:"https://"+url+":"+port+"/releaseTrainServices/manager/"+product+"/"+startDate+"/"+endDate,
       async:false,
       success: function(data){
         dataSet=data;  
@@ -221,8 +433,51 @@ $(function() {
     cb(start, end);
   });
 
-  cb(start, end);        
+   cb(start, end);        
 });
+
+
+
+function drawManagerSummaryTable(data){
+  $(".managertbl").removeClass("managerTable1");
+  $(".managertbl").addClass("managerTable2");
+
+  for (var i=0;i<dataSet.length;i++){
+    if (dataSet[i].id==data){
+      //$('#featureTable').css("display","none");
+      $('#featureTable').css("display","block");
+      //$('#featureTable').show();
+      $('.detailedinfo').empty();
+        var instruction = "<div class=well ><p> Click one of the lables in the Release Summary to see more details. </p></div>"
+      $('.detailedinfo').append(instruction);
+
+      $('.summary').empty();
+
+      var reportedIssueCount=getReportedIssuesCount(dataSet[i].projectId,dataSet[i].versionId,dataSet[i].gitVersionId);
+      var fixedIssueCount=getFixedIssuesCount(dataSet[i].projectId,dataSet[i].versionId,dataSet[i].gitVersionId);
+      
+
+      dataSet[i].reportedIssuesCount=reportedIssueCount;
+      dataSet[i].fixedIssuesCount=fixedIssueCount;
+
+
+      var source   = $("#releaseSummary").html();
+      var template = Handlebars.compile(source);
+      var html    = template(dataSet[i]);
+      
+      $( ".summary" ).append(  html );
+
+      $("#"+managerTableRowId).removeClass("rowHighlight");
+      $("#"+data).addClass("rowHighlight");
+
+      managerTableRowId=data;
+
+
+
+
+    }
+  }
+}
 
 
 function hideSummaryTable(){
@@ -234,7 +489,7 @@ function getData(flag,product){
   if (flag==0){
 
     $.ajax({
-      url:"https://"+url+":"+port+"/base/getProductWiseReleases/"+product,
+      url:"https://"+url+":"+port+"/releaseTrainServices/getProductWiseReleases/"+product,
       async:false,
       success: function(data){
         if (product=="apim"){
@@ -281,14 +536,14 @@ function showStories(storiesCount,versionId,divId){
         $("#storySubjects").empty();
         var dataSet;
         $.ajax({
-          url:"https://"+url+":"+port+"/base/tracker/30"+"/"+versionId,
+          url:"https://"+url+":"+port+"/releaseTrainServices/tracker/30"+"/"+versionId,
           async:false,
           success: function(data){
             dataSet=data;  
           }
         });
 
-        console.log(dataSet);
+        
         for (var i=0;i<dataSet.length;i++){
           dataSet[i].no=i+1;
           var source   = $("#storyDetailedTable").html();
@@ -321,7 +576,7 @@ function showFeatures(featuresCount,versionId,divId){
         $("#featureSubjects").empty();
         var dataSet;
         $.ajax({
-          url:"https://"+url+":"+port+"/base/tracker/2"+"/"+versionId,
+          url:"https://"+url+":"+port+"/releaseTrainServices/tracker/2"+"/"+versionId,
           async:false,
           success: function(data){
             dataSet=data;  
@@ -367,7 +622,7 @@ function showFixedIssues(projectId,versionId,gitVersionId,divId){
     if(gitVersionId!=0){
       var gitRepoAndVersionJson;
       $.ajax({
-          url:"https://"+url+":"+port+"/base/getRepoAndGitVersionByGitId/"+gitVersionId,
+          url:"https://"+url+":"+port+"/releaseTrainServices/getRepoAndGitVersionByGitId/"+gitVersionId,
           async:false,
           success: function(data){
             gitRepoAndVersionJson=data;  
@@ -376,9 +631,10 @@ function showFixedIssues(projectId,versionId,gitVersionId,divId){
 
       var repoName = gitRepoAndVersionJson[0].repoName;
       var versionName = gitRepoAndVersionJson[0].gitVersionName;
+      var repoOrganizationName = gitRepoAndVersionJson[0].repoOrganizationName
       var gitIssuesJson=[];
       $.ajax({
-          url:"https://"+url+":"+port+"/base/getFixedGitIssues/"+repoName+"?versionName="+versionName,
+          url:"https://"+url+":"+port+"/releaseTrainServices/getFixedGitIssues/"+repoOrganizationName+"/"+repoName+"?versionName="+versionName,
           async:false,
           success: function(data){
             gitIssuesJson=data;  
@@ -425,7 +681,7 @@ function showFixedIssues(projectId,versionId,gitVersionId,divId){
     }else{
         var gitRepoAndVersionJson;
         $.ajax({
-          url:"https://"+url+":"+port+"/base/getRepoAndVersion"+"/"+projectId+"/"+versionId,
+          url:"https://"+url+":"+port+"/releaseTrainServices/getRepoAndVersion"+"/"+projectId+"/"+versionId,
           async:false,
           success: function(data){
             gitRepoAndVersionJson=data;  
@@ -438,10 +694,11 @@ function showFixedIssues(projectId,versionId,gitVersionId,divId){
          var gitIssuesJson=[];
          for(i=0;i<repoNames.length;i++){
            var repoName = repoNames[i].repoName;
+           var repoOrganizationName = repoNames[i].repoOrganizationName;
            
            if ((repoName != "") && (versionName != "")){
              $.ajax({
-              url:"https://"+url+":"+port+"/base/getFixedGitIssues/"+repoName+"?versionName="+versionName,
+              url:"https://"+url+":"+port+"/releaseTrainServices/getFixedGitIssues/"+repoOrganizationName+"/"+repoName+"?versionName="+versionName,
               async:false,
               success: function(data){
                 gitIssuesJson=data;  
@@ -498,7 +755,7 @@ function showFixedIssues(projectId,versionId,gitVersionId,divId){
         
 }
 
-function showReportedIssues(projectId,versionId,gitVersionId,divId,){
+function showReportedIssues(projectId,versionId,gitVersionId,divId){
     
     changeButton(divId);
 
@@ -506,7 +763,7 @@ function showReportedIssues(projectId,versionId,gitVersionId,divId,){
 
       var gitRepoAndVersionJson;
       $.ajax({
-          url:"https://"+url+":"+port+"/base/getRepoAndGitVersionByGitId/"+gitVersionId,
+          url:"https://"+url+":"+port+"/releaseTrainServices/getRepoAndGitVersionByGitId/"+gitVersionId,
           async:false,
           success: function(data){
             gitRepoAndVersionJson=data;  
@@ -516,10 +773,11 @@ function showReportedIssues(projectId,versionId,gitVersionId,divId,){
       
       var repoName = gitRepoAndVersionJson[0].repoName;
       var versionName = gitRepoAndVersionJson[0].gitVersionName;
+      var repoOrganizationName = gitRepoAndVersionJson[0].repoOrganizationName
       
       var gitIssuesJson=[];
       $.ajax({
-          url:"https://"+url+":"+port+"/base/getReportedGitIssues/"+repoName+"?versionName="+versionName,
+          url:"https://"+url+":"+port+"/releaseTrainServices/getReportedGitIssues/"+repoOrganizationName+"/"+repoName+"?versionName="+versionName,
           async:false,
           success: function(data){
             gitIssuesJson=data;  
@@ -566,7 +824,7 @@ function showReportedIssues(projectId,versionId,gitVersionId,divId,){
 
       var gitRepoAndVersionJson;
       $.ajax({
-        url:"https://"+url+":"+port+"/base/getRepoAndVersion"+"/"+projectId+"/"+versionId,
+        url:"https://"+url+":"+port+"/releaseTrainServices/getRepoAndVersion"+"/"+projectId+"/"+versionId,
         async:false,
         success: function(data){
           gitRepoAndVersionJson=data;  
@@ -579,10 +837,11 @@ function showReportedIssues(projectId,versionId,gitVersionId,divId,){
      var gitIssuesJson=[];
      for(i=0;i<repoNames.length;i++){
        var repoName = repoNames[i].repoName;
+       var repoOrganizationName = repoNames[i].repoOrganizationName;
       
        if ((repoName != "") && (versionName != "")){
          $.ajax({
-          url:"https://"+url+":"+port+"/base/getReportedGitIssues/"+repoName+"?versionName="+versionName,
+          url:"https://"+url+":"+port+"/releaseTrainServices/getReportedGitIssues/"+repoOrganizationName+"/"+repoName+"?versionName="+versionName,
           async:false,
           success: function(data){
             gitIssuesJson=data;  
@@ -596,7 +855,7 @@ function showReportedIssues(projectId,versionId,gitVersionId,divId,){
        
      }
  
-    
+      
 
     if (gitIssuesJson.length == 0){
       $('.detailedinfo').empty();
@@ -636,6 +895,10 @@ function showReportedIssues(projectId,versionId,gitVersionId,divId,){
     }
        
 }
+
+
+
+
 
 
 

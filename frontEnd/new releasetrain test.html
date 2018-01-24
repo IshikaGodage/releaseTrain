@@ -19,8 +19,10 @@
   <!-- Include Required Prerequisites datepicker-->
   <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/bootstrap/3/css/bootstrap.css" />
    
+  
   <!-- Include Date Range Picker css-->
-  <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/bootstrap.daterangepicker/2/daterangepicker.css" />
+  <!-- <link href="/portal/store/carbon.super/fs/gadget/pmt/css/daterangepicker.css" rel="stylesheet"> -->
+  <link href="css/daterangepicker.css" rel="stylesheet">
 
   <!-- wso2 loader css-->
   <link rel="stylesheet" href="css/wso2loading.css">
@@ -32,7 +34,8 @@
       <table class="ex2">
 
         {{#each releases}}
-          <tr onclick="displaySummaryTable({{this.id}})">
+          <!-- <tr onclick="displaySummaryTable({{this.id}})"> -->
+          <tr class="cardItem" myid='{{this.id}}'>
               <td id='{{this.id}}'  class="btn label btn-x" data-control="userBtn" style="font-size: 10px;background-color:{{this.color}}; padding-top: 0px;padding-bottom: 0px;align-items: left;">
                 <span class="glyphicon glyphicon-bullhorn"></span>
                 <span>{{this.releaseProduct}} -</span>
@@ -235,7 +238,8 @@
           </div>
         
           <!-- start the Managers tab -->
-          <div id="managers" class="tab-pane fade">
+          <div id="managers" class="tab-pane fade" >
+            
             <div class="row">
             <br>
                 
@@ -287,7 +291,7 @@
 
                 <!-- If there is no data, then this area will be dispalyed (logic check by java script function)-->
                 <div id=errormsg >
-                  <div class=well ><p> no data </p></div>
+                  <div class=well ><p> No data to display. </p></div>
                 </div>
 
             </div>
