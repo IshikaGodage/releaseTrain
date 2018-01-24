@@ -14,7 +14,11 @@ import ballerina.lang.strings;
 import ballerina.lang.datatables;
 
 
-sql:ClientConnector rmDB = createDBConnection();
+
+
+
+
+
 http:ClientConnector redmineConn = null;
 http:ClientConnector gitHubConn = null;
 
@@ -51,7 +55,7 @@ function getConfData (string filePath) (json) {
     return null;
 
 }
-
+json confJson = getConfData("config.json");
 
 function getDatabaseMap (json configData)(map) {
 
@@ -88,20 +92,18 @@ function getDatabaseMap (json configData)(map) {
 
 }
 function createDBConnection()(sql:ClientConnector) {
-    json confJson = getConfData("config.json");
+
     map props = getDatabaseMap(confJson);
-    rmDB = create sql:ClientConnector(props);
+    sql:ClientConnector rmDB = create sql:ClientConnector(props);
     return rmDB;
 }
 
 function createRMConnection(){
-    json configData = getConfData("config.json");
     string rmUrl;
-    rmUrl = jsons:getString(configData, "$.REDMINE.RM_URL");
+    rmUrl = jsons:getString(confJson, "$.REDMINE.RM_URL");
     redmineConn = create http:ClientConnector(rmUrl);
 }
 function getRedmineRequest()(message){
-    json confJson = getConfData("config.json");
     string rmApiKey;
     try{
         rmApiKey, _= (string)confJson.REDMINE.RM_API_KEY;
@@ -116,7 +118,6 @@ function getRedmineRequest()(message){
 }
 
 function createtGitHubConnection(){
-    json confJson = getConfData("config.json");
     string gitHubUrl;
 
     try{
@@ -130,7 +131,6 @@ function createtGitHubConnection(){
 
 }
 function getGitHubRequest()(message){
-    json confJson = getConfData("config.json");
     string gitHubToken;
     try{
         gitHubToken, _= (string)confJson.GITHUB.GITHUB_TOKEN;
@@ -175,6 +175,8 @@ function getCycles(string path, int limit)(int){
 }
 function updateProject() {
 
+
+
     if (redmineConn == null) {
         createRMConnection();
     }
@@ -182,6 +184,7 @@ function updateProject() {
     z -> updateProjectTable;
 
     worker updateProjectTable {
+        sql:ClientConnector rmDB = createDBConnection();
         logger:info("RM_PROJECT TABLE SYNC STARTED...");
         message context;
         context <- default;
@@ -283,9 +286,11 @@ function updateProject() {
         }
         logger:info(updaterows + " RECORDS ARE UPDATED");
         logger:info("RM_PROJECT TABLE SYNC DONE.");
+        rmDB.close();
 
     }}
 function updateUser(){
+
 
 
     if (redmineConn == null) {
@@ -295,6 +300,7 @@ function updateUser(){
     z -> updateUserTable;
 
     worker updateUserTable {
+        sql:ClientConnector rmDB = createDBConnection();
         logger:info("RM_USER TABLE SYNC STARTED...");
         message  context;
         context <- default;
@@ -372,8 +378,11 @@ function updateUser(){
         }
         logger:info(insertrows + " RECORDS ARE INSERTED");
         logger:info("RM_USER TABLE SYNC DONE.");
+        rmDB.close();
     }}
 function updateVersion (){
+
+
 
     if (redmineConn == null) {
         createRMConnection();
@@ -386,6 +395,7 @@ function updateVersion (){
 
 
     worker updateVersionTable {
+        sql:ClientConnector rmDB = createDBConnection();
         logger:info("RM_VERSION TABLE SYNC STARTED...");
         message  context;
         context <- default;
@@ -620,8 +630,11 @@ function updateVersion (){
         logger:info(insertrows + " RECORDS ARE INSERTED");
         logger:info(updaterows + " RECORDS ARE UPDATED");
         logger:info("RM_VERSION TABLE SYNC DONE.");
+        rmDB.close();
     }}
 function updateIssue (){
+
+
 
     if (redmineConn == null) {
         createRMConnection();
@@ -632,6 +645,7 @@ function updateIssue (){
 
 
     worker updateIssueTable {
+        sql:ClientConnector rmDB = createDBConnection();
         logger:info("RM_ISSUE TABLE SYNC STARTED...");
         message  context;
         context <- default;
@@ -759,12 +773,14 @@ function updateIssue (){
         logger:info(insertrows + " RECORDS ARE INSERTED");
         logger:info(updaterows + " RECORDS ARE UPDATED");
         logger:info("RM_ISSUE TABLE SYNC DONE.");
+        rmDB.close();
 
     }}
 
 function getAllReleases()(json){
 
 
+    sql:ClientConnector rmDB = createDBConnection();
 
     sql:Parameter[] params = [];
     sql:Parameter[] params1 = [];
@@ -790,6 +806,7 @@ function getAllReleases()(json){
     var redmineLoopIndex = 0;
     var unicId=0;
 
+
     while (redmineLoopIndex < redmineReleaseDatesCount) {
 
         json data={};
@@ -808,6 +825,7 @@ function getAllReleases()(json){
 
         var redmineReleaseDetailsLength = lengthof redmineReleaseDetailsJson;
         var redmineReleaseIndex = 0;
+
 
 
         while (redmineReleaseIndex < redmineReleaseDetailsLength) {
@@ -882,6 +900,8 @@ function getAllReleases()(json){
     datatables:close(dtGitHubReleaseDates);
     var gitHubReleaseDatesCount = lengthof gitHubReleaseDatesJson;
     var gitHubLoopIndex = 0;
+
+
     while(gitHubLoopIndex < gitHubReleaseDatesCount) {
 
         json data={};
@@ -897,6 +917,7 @@ function getAllReleases()(json){
 
         var gitHubReleaseDetailsLength = lengthof gitHubReleaseDetailsJson;
         var gitHubReleaseIndex = 0;
+
 
 
         while (gitHubReleaseIndex < gitHubReleaseDetailsLength) {
@@ -1003,11 +1024,12 @@ function getAllReleases()(json){
         gitHubLoopIndex = gitHubLoopIndex + 1;
     }
 
-
+    rmDB.close();
     return allReleases;
 }
 function getReleasesByProductArea (string productArea) (json) {
 
+    sql:ClientConnector rmDB = createDBConnection();
 
     sql:Parameter[] params = [];
     sql:Parameter[] params1 = [];
@@ -1081,6 +1103,7 @@ function getReleasesByProductArea (string productArea) (json) {
             }
 
             redmineReleaseDetailsJson[redmineReleaseIndex].color = color;
+            redmineReleaseDetailsJson[redmineReleaseIndex].gitVersionId = 0;
 
             sql:Parameter redmineVersionId = {sqlType:"integer", value:versionId};
             sql:Parameter redmineFeatureId = {sqlType:"integer", value:2};//Feature
@@ -1245,12 +1268,12 @@ function getReleasesByProductArea (string productArea) (json) {
             gitHubLoopIndex = gitHubLoopIndex + 1;
         }
 
-
+    rmDB.close();
     return allReleases;
 }
 function getManagers(string productArea, string startDate, string endDate) (json) {
 
-
+    sql:ClientConnector rmDB = createDBConnection();
 
     json managerJson = [];
 
@@ -1318,11 +1341,13 @@ function getManagers(string productArea, string startDate, string endDate) (json
         loopIndex = loopIndex + 1;
     }
 
+    rmDB.close();
     return managerJson;
 
 }
 function getTrackerSubjects(int trackerId, int versionId)(json){
 
+    sql:ClientConnector rmDB = createDBConnection();
 
     json trackerSubjects=[];
     sql:Parameter[] params1 = [];
@@ -1338,10 +1363,11 @@ function getTrackerSubjects(int trackerId, int versionId)(json){
     logger:debug(trackerSubjects);
     datatables:close(dtRedmineTrackerSubjects);
 
+    rmDB.close();
     return trackerSubjects;
 }
 
-function getGitHubPages(string repoName, string versionName, string states, int pageLimit)(int){
+function getGitHubPages(string repoOrganizationName, string repoName, string versionName, string states, int pageLimit)(int){
     if(gitHubConn==null){
         createtGitHubConnection();
     }
@@ -1376,7 +1402,8 @@ function getGitHubPages(string repoName, string versionName, string states, int 
     return finalPages;
 
 }
-function getInitialIssues(string repoName, string versionName, string states, int pageLimit)(json){
+
+function getInitialIssues(string repoOrganizationName, string repoName, string versionName, string states, int pageLimit)(json){
     if(gitHubConn==null){
         createtGitHubConnection();
     }
@@ -1387,7 +1414,7 @@ function getInitialIssues(string repoName, string versionName, string states, in
     json jsonRes ={};
 
     req = getGitHubRequest();
-    json variables = { "loginName": "wso2", "repoName": repoName,  "pageLimit":pageLimit, "issueStates": states, "versionName": versionName};
+    json variables = { "loginName": repoOrganizationName, "repoName": repoName,  "pageLimit":pageLimit, "issueStates": states, "versionName": versionName};
     string query = "query ($loginName:String! $repoName:String! $pageLimit:Int! $issueStates:[IssueState!] $versionName:[String!]){ organization(login: $loginName) { repository(name:$repoName) { name, issues(first: $pageLimit, states:$issueStates, labels:$versionName) { totalCount,pageInfo{ hasNextPage,endCursor }, nodes{ title,url } } } } }";
 
     jsonPost.query = query;
@@ -1405,7 +1432,7 @@ function getInitialIssues(string repoName, string versionName, string states, in
     return jsonRes;
 
 }
-function getNextIssues(string repoName, string versionName, string states, int pageLimit, string nextPageLink)(json){
+function getNextIssues(string repoOrganizationName, string repoName, string versionName, string states, int pageLimit, string nextPageLink)(json){
     if(gitHubConn==null){
         createtGitHubConnection();
     }
@@ -1416,7 +1443,7 @@ function getNextIssues(string repoName, string versionName, string states, int p
     json jsonRes ={};
 
     req = getGitHubRequest();
-    json variables = { "loginName": "wso2", "repoName": repoName,  "pageLimit":pageLimit, "nextPageLink":nextPageLink, "issueStates": states, "versionName": versionName};
+    json variables = { "loginName": repoOrganizationName, "repoName": repoName,  "pageLimit":pageLimit, "nextPageLink":nextPageLink, "issueStates": states, "versionName": versionName};
     string query = "query ($loginName:String! $repoName:String! $nextPageLink:String! $pageLimit:Int! $issueStates:[IssueState!] $versionName:[String!]){ organization(login: $loginName) { repository(name:$repoName) { name, issues(first: $pageLimit, after:$nextPageLink, states:$issueStates, labels:$versionName) { totalCount,pageInfo{ hasNextPage,endCursor }, nodes{ title,url } } } } }";
 
     jsonPost.query = query;
@@ -1427,7 +1454,7 @@ function getNextIssues(string repoName, string versionName, string states, int p
     jsonRes = messages:getJsonPayload(resp);
     return jsonRes;
 }
-function getFixedGitIssues(string repoName , string versionName)(json){
+function getFixedGitIssues(string repoOrganizationName, string repoName , string versionName)(json){
 
     json jsonFinal=[];
 
@@ -1435,7 +1462,7 @@ function getFixedGitIssues(string repoName , string versionName)(json){
     int pageLimit = 100; // maximum page limit is 100.
 
 
-    json jsonRes = getInitialIssues(repoName, versionName, states, pageLimit);
+    json jsonRes = getInitialIssues(repoOrganizationName, repoName, versionName, states, pageLimit);
     int count;
     boolean hasNextPage;
     string nextPageLink;
@@ -1455,7 +1482,7 @@ function getFixedGitIssues(string repoName , string versionName)(json){
 
     int i = 1;
     while(hasNextPage){
-        jsonRes = getNextIssues(repoName, versionName, states, pageLimit, nextPageLink);
+        jsonRes = getNextIssues(repoOrganizationName, repoName, versionName, states, pageLimit, nextPageLink);
         count, _ =(int)jsonRes.data.organization.repository.issues.totalCount;
         hasNextPage, _ =(boolean)jsonRes.data.organization.repository.issues.pageInfo.hasNextPage;
         nextPageLink, _=(string )jsonRes.data.organization.repository.issues.pageInfo.endCursor;
@@ -1472,7 +1499,7 @@ function getFixedGitIssues(string repoName , string versionName)(json){
 
 
 }
-function getReportedGitIssues(string repoName , string versionName)(json){
+function getReportedGitIssues(string repoOrganizationName, string repoName , string versionName)(json){
 
     json jsonFinal=[];
 
@@ -1480,7 +1507,7 @@ function getReportedGitIssues(string repoName , string versionName)(json){
     int pageLimit = 100; // maximum page limit is 100.
 
 
-    json jsonRes = getInitialIssues(repoName, versionName, states, pageLimit);
+    json jsonRes = getInitialIssues(repoOrganizationName, repoName, versionName, states, pageLimit);
     int count;
     boolean hasNextPage;
     string nextPageLink;
@@ -1501,7 +1528,7 @@ function getReportedGitIssues(string repoName , string versionName)(json){
 
     int i = 1;
     while(hasNextPage){
-        jsonRes = getNextIssues(repoName, versionName, states, pageLimit, nextPageLink);
+        jsonRes = getNextIssues(repoOrganizationName, repoName, versionName, states, pageLimit, nextPageLink);
         count, _ =(int)jsonRes.data.organization.repository.issues.totalCount;
         hasNextPage, _ =(boolean)jsonRes.data.organization.repository.issues.pageInfo.hasNextPage;
         nextPageLink, _=(string )jsonRes.data.organization.repository.issues.pageInfo.endCursor;
@@ -1520,6 +1547,8 @@ function getReportedGitIssues(string repoName , string versionName)(json){
 
 function getRepoAndVersion(int projectId, int versionId)(json){
 
+    sql:ClientConnector rmDB = createDBConnection();
+
     sql:Parameter[] params1 = [];
     sql:Parameter[] params2 = [];
 
@@ -1535,7 +1564,6 @@ function getRepoAndVersion(int projectId, int versionId)(json){
 
 
 
-
     datatable dtRedmoneVersionName = rmDB.select(GET_REDMINE_VERSION_NAMES, params2);
     var jsonVersion, _= <json>dtRedmoneVersionName;
     logger:debug(jsonVersion);
@@ -1544,12 +1572,15 @@ function getRepoAndVersion(int projectId, int versionId)(json){
     var versionName, _=(string)jsonVersion[0].versionName;
 
     json jsonFinal ={"repoNames":jsonRepo, "versionName":versionName};
+
+    rmDB.close();
     return jsonFinal;
 
 
 }
 function getRepoAndGitVersionByGitId(int gitVersionId)(json) {
 
+    sql:ClientConnector rmDB = createDBConnection();
     sql:Parameter[] params1 = [];
 
     sql:Parameter gitHubVersionId = {sqlType:"integer", value:gitVersionId};
@@ -1561,15 +1592,22 @@ function getRepoAndGitVersionByGitId(int gitVersionId)(json) {
     logger:debug(jsonRepo);
     datatables:close(dtGitHubRepoAndVersioNames);
 
+
+
     var versionName, _ = (string)jsonRepo[0].gitVersionName;
     int stringLength= strings:length(versionName);
     var subStringVersionName= strings:subString(versionName,1,stringLength);
     jsonRepo[0].gitVersionName =  subStringVersionName;
+
+    rmDB.close();
     return jsonRepo;
 
 }
 
 function updateGitHubReleases(){
+
+
+
     if(gitHubConn==null){
         createtGitHubConnection();
     }
@@ -1578,6 +1616,7 @@ function updateGitHubReleases(){
     z -> updateGit;
 
     worker updateGit {
+        sql:ClientConnector rmDB = createDBConnection();
         logger:info("GH_RELEASES TABLE SYNC STARTED...");
         message  context;
         context <- default;
@@ -1594,9 +1633,16 @@ function updateGitHubReleases(){
         int loopIndex = 0;
         while (loopIndex < lengthof repoJson) {
             var repoName, _ = (string)repoJson[loopIndex].GITHUB_REPO_NAME;
+            var repoOrganizationName, _ = (string)repoJson[loopIndex].GITHUB_ORGANIZATION_NAME;
 
             sql:Parameter[] params2 = [];
             sql:Parameter gitHubRepoName = {sqlType:"varchar", value:repoName};
+            sql:Parameter gitHubRepoOrganizationName = {sqlType:"varchar", value:repoOrganizationName};
+
+            logger:info("repoName: "+repoName);
+            logger:info("organization: "+repoOrganizationName);
+            logger:info("-----------------------------------");
+
             params2 = [gitHubRepoName];
             datatable dtGitVersionCount = rmDB.select(GITHUB_VERSION_CHECK, params2);
             var gitVersionCountJson, _ = <json>dtGitVersionCount;
@@ -1618,7 +1664,8 @@ function updateGitHubReleases(){
                 datatables:close(dtGitLastCursor);
                 var lastInsertedLink, _=(string)gitLstCursorJson[0].CURSOR_NAME;
 
-                json gitHubReleasesJson = getGitHubReleases(repoName, lastInsertedLink);
+                json gitHubReleasesJson = getGitHubReleases(repoOrganizationName,repoName, lastInsertedLink);
+
 
                 var repoPageCount = lengthof gitHubReleasesJson;
                 int pageIndex = 0;
@@ -1632,13 +1679,33 @@ function updateGitHubReleases(){
                         var releaseDate ="";
 
 
+                        if(gitHubReleasesJson[pageIndex][releaseIndex].node != null) {
 
-                        if(gitHubReleasesJson[pageIndex][releaseIndex].node.tag != null) {
-                            cursor, _ = (string)gitHubReleasesJson[pageIndex][releaseIndex].cursor;
-                            versionName, _ = (string)gitHubReleasesJson[pageIndex][releaseIndex].node.tag.name;
-                            releaseDate, _ =(string)gitHubReleasesJson[pageIndex][releaseIndex].node.publishedAt;
-                            insertGitHubReleases(repoName,versionName,releaseDate,cursor);
-                            logger:info("NEW RECORD INSERTED.");
+
+                            if (gitHubReleasesJson[pageIndex][releaseIndex].node.tag != null) {
+                                cursor, _ = (string)gitHubReleasesJson[pageIndex][releaseIndex].cursor;
+                                versionName, _ = (string)gitHubReleasesJson[pageIndex][releaseIndex].node.tag.name;
+                                releaseDate, _ = (string)gitHubReleasesJson[pageIndex][releaseIndex].node.publishedAt;
+
+
+                                time:Time releaseDateAndTime = time:parse(releaseDate, "yyyy-MM-dd'T'HH:mm:ssz");
+                                time:Time localReleaseDateAndTime = time:toTimezone(releaseDateAndTime, "Asia/Colombo");
+                                string localReleaseDateAndTimeString = time:toString(localReleaseDateAndTime);
+
+
+                                sql:Parameter[] paramsInsert = [];
+                                sql:Parameter gitHubVersionName = {sqlType:"varchar", value:versionName};
+                                sql:Parameter gitHubReleaseDate = {sqlType:"varchar", value:localReleaseDateAndTimeString};
+                                sql:Parameter gitHubReleaseCursor = {sqlType:"varchar", value:cursor};
+                                paramsInsert = [gitHubRepoName, gitHubVersionName, gitHubReleaseDate, gitHubReleaseCursor];
+
+                                int insertResult = rmDB.update(GITHUB_RELEASES_INSERT, paramsInsert);
+
+                                //insertGitHubReleases(repoName, versionName, releaseDate, cursor); this function is not use.
+
+                                logger:info("NEW RECORD INSERTED.");
+
+                            }
 
                         }
 
@@ -1650,11 +1717,14 @@ function updateGitHubReleases(){
                 }
             } else {
 
-                json gitHubInitialReleasesJson = getinitialGiHubReleases(repoName);
+                json gitHubInitialReleasesJson = getinitialGiHubReleases(repoOrganizationName, repoName);
+
+
 
                 var repoPageCount = lengthof gitHubInitialReleasesJson;
                 int pageIndex = 0;
                 while (pageIndex < repoPageCount) {
+
                     var releaseCount= lengthof gitHubInitialReleasesJson[pageIndex];
                     int releaseIndex = 0;
                     while(releaseIndex < releaseCount) {
@@ -1663,15 +1733,33 @@ function updateGitHubReleases(){
                         var versionName="";
                         var releaseDate ="";
 
+                        if(gitHubInitialReleasesJson[pageIndex][releaseIndex].node != null) {
+
+                            if(gitHubInitialReleasesJson[pageIndex][releaseIndex].node.tag != null) {
 
 
-                        if(gitHubInitialReleasesJson[pageIndex][releaseIndex].node.tag != null) {
-                            cursor, _ = (string)gitHubInitialReleasesJson[pageIndex][releaseIndex].cursor;
-                            versionName, _ = (string)gitHubInitialReleasesJson[pageIndex][releaseIndex].node.tag.name;
-                            releaseDate, _ =(string)gitHubInitialReleasesJson[pageIndex][releaseIndex].node.publishedAt;
-                            insertGitHubReleases(repoName,versionName,releaseDate,cursor);
-                            logger:info("NEW RECORD INSERTED.");
+                                cursor, _ = (string)gitHubInitialReleasesJson[pageIndex][releaseIndex].cursor;
+                                versionName, _ = (string)gitHubInitialReleasesJson[pageIndex][releaseIndex].node.tag.name;
+                                releaseDate, _ =(string)gitHubInitialReleasesJson[pageIndex][releaseIndex].node.publishedAt;
 
+                                time:Time releaseDateAndTime = time:parse(releaseDate, "yyyy-MM-dd'T'HH:mm:ssz");
+                                time:Time localReleaseDateAndTime = time:toTimezone(releaseDateAndTime, "Asia/Colombo");
+                                string localReleaseDateAndTimeString = time:toString(localReleaseDateAndTime);
+
+
+                                sql:Parameter[] paramsInsert = [];
+                                sql:Parameter gitHubVersionName = {sqlType:"varchar", value:versionName};
+                                sql:Parameter gitHubReleaseDate = {sqlType:"varchar", value:localReleaseDateAndTimeString};
+                                sql:Parameter gitHubReleaseCursor = {sqlType:"varchar", value:cursor};
+                                paramsInsert = [gitHubRepoName, gitHubVersionName, gitHubReleaseDate, gitHubReleaseCursor];
+
+                                int insertResult = rmDB.update(GITHUB_RELEASES_INSERT, paramsInsert);
+
+
+                                //insertGitHubReleases(repoName,versionName,releaseDate,cursor); This function is not use
+                                logger:info("NEW RECORD INSERTED.");
+
+                            }
                         }
 
                         releaseIndex = releaseIndex + 1;
@@ -1687,13 +1775,19 @@ function updateGitHubReleases(){
         }
 
     logger:info("GH_RELEASES TABLE SYNC DONE.");
+    rmDB.close();
 
     }}
 function insertGitHubReleases(string repoName, string versionName, string releaseDate, string cursor){
 
+    //This function is not use
+
+    sql:ClientConnector rmDB = createDBConnection();
+
     time:Time releaseDateAndTime = time:parse(releaseDate, "yyyy-MM-dd'T'HH:mm:ssz");
     time:Time localReleaseDateAndTime = time:toTimezone(releaseDateAndTime, "Asia/Colombo");
     string localReleaseDateAndTimeString = time:toString(localReleaseDateAndTime);
+
 
 
     sql:Parameter[] params1 = [];
@@ -1705,11 +1799,13 @@ function insertGitHubReleases(string repoName, string versionName, string releas
 
     int insertResult = rmDB.update(GITHUB_RELEASES_INSERT, params1);
 
+    rmDB.close();
+
 }
 
-function getinitialGiHubReleases(string repoName)(json){
+function getinitialGiHubReleases(string repoOrganizationName, string repoName)(json){
     int pageLimit = 100;
-    json jsonRes =  getfirstReleases(repoName, pageLimit);
+    json jsonRes =  getfirstReleases(repoOrganizationName, repoName, pageLimit);
 
     json jsonFinal=[];
 
@@ -1732,25 +1828,25 @@ function getinitialGiHubReleases(string repoName)(json){
     }
 
 
-    int i = 1;
+    int loopIndex = 1;
     while(hasNextPage){
 
 
-        jsonRes = getNextReleases(repoName, nextPageLink, pageLimit);
+        jsonRes = getNextReleases(repoOrganizationName, repoName, nextPageLink, pageLimit);
         edges = jsonRes.data.repository.releases.edges;
         hasNextPage, _ = (boolean)jsonRes.data.repository.releases.pageInfo.hasNextPage;
         nextPageLink, _ = (string)jsonRes.data.repository.releases.pageInfo.endCursor;
         count, _ =(int)jsonRes.data.repository.releases.totalCount;
 
-        jsonFinal[i]=edges;
+        jsonFinal[loopIndex] = edges;
 
-        i = i + 1;
+        loopIndex = loopIndex + 1;
     }
 
     return jsonFinal;
 
 }
-function getGitHubReleases(string repoName, string lastInsertedLink)(json){
+function getGitHubReleases(string repoOrganizationName, string repoName, string lastInsertedLink)(json){
     int pageLimit = 100;
     json jsonFinal=[];
     int count;
@@ -1759,10 +1855,10 @@ function getGitHubReleases(string repoName, string lastInsertedLink)(json){
     json edges;
     json jsonRes;
 
-    int i = 0;
+    int loopIndex = 0;
     while(hasNextPage){
 
-        jsonRes = getNextReleases(repoName, nextPageLink, pageLimit);
+        jsonRes = getNextReleases(repoOrganizationName, repoName, nextPageLink, pageLimit);
 
         hasNextPage, _ = (boolean)jsonRes.data.repository.releases.pageInfo.hasNextPage;
 
@@ -1774,19 +1870,19 @@ function getGitHubReleases(string repoName, string lastInsertedLink)(json){
 
 
             if (count > 0) {
-                jsonFinal[i] = edges;
+                jsonFinal[loopIndex] = edges;
             } else {
                 jsonFinal = [];
             }
         }
 
-        i = i + 1;
+        loopIndex = loopIndex + 1;
     }
 
     return jsonFinal;
 
 }
-function getfirstReleases(string repoName, int pageLimit)(json){
+function getfirstReleases(string repoOrganizationName, string repoName, int pageLimit)(json){
     if(gitHubConn==null){
         createtGitHubConnection();
     }
@@ -1799,7 +1895,7 @@ function getfirstReleases(string repoName, int pageLimit)(json){
 
     req = getGitHubRequest();
 
-    json variables = {"loginName": "wso2", "repoName": repoName, "pageLimit": pageLimit, "sort": {"field": "CREATED_AT","direction": "ASC"}};
+    json variables = {"loginName": repoOrganizationName, "repoName": repoName, "pageLimit": pageLimit, "sort": {"field": "CREATED_AT","direction": "ASC"}};
     string query="query($loginName:String!,$repoName:String!,$pageLimit:Int!$sort:ReleaseOrder){ repository(owner: $loginName, name: $repoName) { releases(first: $pageLimit,orderBy:$sort) { edges { cursor node { name tag{ name id } publishedAt }} pageInfo { hasNextPage endCursor } totalCount }}}";
 
     jsonPost.query = query;
@@ -1815,7 +1911,7 @@ function getfirstReleases(string repoName, int pageLimit)(json){
 
 
 }
-function getNextReleases(string repoName, string nextPageLink, int pageLimit)(json){
+function getNextReleases(string repoOrganizationName, string repoName, string nextPageLink, int pageLimit)(json){
     if(gitHubConn==null){
         createtGitHubConnection();
     }
@@ -1828,7 +1924,7 @@ function getNextReleases(string repoName, string nextPageLink, int pageLimit)(js
     req = getGitHubRequest();
 
 
-    json variables = {"loginName": "wso2", "repoName": repoName, "pageLimit": pageLimit,"nextPageLink": nextPageLink, "sort": {"field": "CREATED_AT","direction": "ASC"}};
+    json variables = {"loginName": repoOrganizationName, "repoName": repoName, "pageLimit": pageLimit,"nextPageLink": nextPageLink, "sort": {"field": "CREATED_AT","direction": "ASC"}};
     string query="query($loginName:String!,$repoName:String!,$pageLimit:Int!,$nextPageLink:String!,$sort:ReleaseOrder){ repository(owner: $loginName, name: $repoName) { releases(first: $pageLimit,after:$nextPageLink,orderBy:$sort) { edges { cursor node { name tag{ name id } publishedAt }} pageInfo { hasNextPage endCursor } totalCount }}}";
     jsonPost.query = query;
     jsonPost.variables =variables;
@@ -1837,9 +1933,57 @@ function getNextReleases(string repoName, string nextPageLink, int pageLimit)(js
     resp= gitHubConn.post("/graphql", req);
     jsonRes = messages:getJsonPayload(resp);
 
+
     var count, _ =(int)jsonRes.data.repository.releases.totalCount;
     return jsonRes;
 
 }
 
+function getFixedGitIssuesCount(string repoOrganizationName, string repoName , string versionName)(json){
 
+    json jsonFinal={};
+
+    string states = "CLOSED";
+    int pageLimit = 1; // maximum page limit is 100.
+
+    json jsonRes = getInitialIssues(repoOrganizationName, repoName, versionName, states, pageLimit);
+    int count = 0;
+
+    if (jsonRes!= null) {
+        count, _ = (int)jsonRes.data.organization.repository.issues.totalCount;
+
+        jsonFinal["count"] = count;
+    }else{
+        jsonFinal["count"] = count;
+    }
+
+
+
+    return jsonFinal;
+
+
+}
+function getReportedGitIssuesCount(string repoOrganizationName, string repoName , string versionName)(json){
+
+    json jsonFinal={};
+
+    string states = "OPEN";
+    int pageLimit = 1; // maximum page limit is 100.
+
+    json jsonRes = getInitialIssues(repoOrganizationName, repoName, versionName, states, pageLimit);
+    int count = 0;
+
+    if (jsonRes!= null) {
+        count, _ = (int)jsonRes.data.organization.repository.issues.totalCount;
+
+        jsonFinal["count"] = count;
+    }else{
+        jsonFinal["count"] = count;
+    }
+
+
+
+    return jsonFinal;
+
+
+}
